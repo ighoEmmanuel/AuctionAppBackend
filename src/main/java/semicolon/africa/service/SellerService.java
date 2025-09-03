@@ -9,7 +9,4 @@ import semicolon.africa.dtos.request.RegisterDto;
 
 public interface SellerService {
     RegisterResponse register(RegisterDto registerDto);
-    AuctionResponse auctionProduct(AuctionProductDto addProductDto);
-    String highestBidder(String productionId);
-
-}
+    }

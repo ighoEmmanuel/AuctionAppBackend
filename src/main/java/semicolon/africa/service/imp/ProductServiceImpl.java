@@ -1,11 +1,10 @@
 package semicolon.africa.service.imp;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import semicolon.africa.data.models.Product;
-import semicolon.africa.data.models.Seller;
+import semicolon.africa.data.models.User;
 import semicolon.africa.data.repositories.ProductRepository;
-import semicolon.africa.data.repositories.SellerRepository;
+import semicolon.africa.data.repositories.UserRepository;
 import semicolon.africa.dtos.reposonse.AuctionResponse;
 import semicolon.africa.dtos.request.AuctionProductDto;
 import semicolon.africa.service.ProductService;
@@ -20,22 +19,22 @@ import java.util.Optional;
 public class ProductServiceImpl implements ProductService {
 
     private final ProductRepository productRepository;
-    private  final SellerRepository sellerRepository;
+    private  final UserRepository userRepository;
 
     @Autowired
-    public ProductServiceImpl(ProductRepository productRepository, SellerRepository sellerRepository) {
+    public ProductServiceImpl(ProductRepository productRepository, UserRepository userRepository) {
         this.productRepository = productRepository;
-        this.sellerRepository = sellerRepository;
+        this.userRepository = userRepository;
 
     }
 
     @Override
     public AuctionResponse auctionProduct(AuctionProductDto productDto) {
-        String sellerId = productDto.getSellerId();
-        Optional<Seller> seller = sellerRepository.findById(sellerId);
+        String userId = productDto.getSellerId();
+        Optional<User> user = userRepository.findById(userId);
 
-        if (seller.isEmpty()) {
-            throw new IllegalArgumentException("Seller with ID " + sellerId + " does not exist.");
+        if (user.isEmpty()) {
+            throw new IllegalArgumentException("Seller with ID " + userId + " does not exist.");
         }
 
         LocalDateTime startTime = productDto.getBidStart();
@@ -51,9 +50,9 @@ public class ProductServiceImpl implements ProductService {
         product.setBidStartTime(startTime);
         product.setBidStopTime(endTime);
 
-        seller.get().getProducts().add(product);
+        user.get().getProducts().add(product);
         productRepository.save(product);
-        sellerRepository.save(seller.get());
+        userRepository.save(user.get());
 
         AuctionResponse auctionResponse = new AuctionResponse();
         auctionResponse.setProductId(product.getId());

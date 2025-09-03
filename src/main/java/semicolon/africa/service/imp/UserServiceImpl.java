@@ -1,36 +1,83 @@
 package semicolon.africa.service.imp;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import semicolon.africa.data.models.*;
-import semicolon.africa.data.repositories.BidderRepository;
-import semicolon.africa.data.repositories.SellerRepository;
 import semicolon.africa.data.repositories.UserRepository;
+import semicolon.africa.dtos.reposonse.AuctionResponse;
+import semicolon.africa.dtos.reposonse.BidResponse;
 import semicolon.africa.dtos.reposonse.ProfileResponse;
+import semicolon.africa.dtos.reposonse.RegisterResponse;
+import semicolon.africa.dtos.request.AuctionProductDto;
+import semicolon.africa.dtos.request.BidDto;
 import semicolon.africa.dtos.request.ProfileDto;
-import semicolon.africa.service.BidderService;
+import semicolon.africa.dtos.request.RegisterDto;
+import semicolon.africa.exceptions.EmailError;
+import semicolon.africa.exceptions.PasswordError;
+import semicolon.africa.security.JwtUtil;
+import semicolon.africa.service.BidService;
+import semicolon.africa.service.ProductService;
 import semicolon.africa.service.UserService;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
 @Service
 public class UserServiceImpl implements UserService {
 
-    private final BidderService bidderService;
-    private final BidderRepository bidderRepository;
-    private UserRepository userRepository;
-    private SellerRepository sellerRepository;
+    private final UserRepository userRepository;
+    private final BCryptPasswordEncoder passwordEncoder;
+    private final ProductService productService;
+    private final BidService bidService;
+    private final JwtUtil jwtUtil;
 
     @Autowired
-    public UserServiceImpl(UserRepository userRepository, BidderService bidderService, BidderRepository bidderRepository, SellerRepository sellerRepository) {
+    public UserServiceImpl(UserRepository userRepository, BCryptPasswordEncoder passwordEncoder, ProductService productService, BidService bidService, JwtUtil jwtUtil) {
         this.userRepository = userRepository;
-        this.bidderService = bidderService;
-        this.bidderRepository = bidderRepository;
-        this.sellerRepository = sellerRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.productService = productService;
+        this.bidService = bidService;
+        this.jwtUtil = jwtUtil;
     }
 
 
+    @Override
+    public RegisterResponse register(RegisterDto registerDto) {
+        if(registerDto == null){
+            throw new IllegalArgumentException("All fields are required");
+        }
+        if (registerDto.getUserName() == null ||registerDto.getUserName().isBlank()) {
+            throw new IllegalArgumentException("Username is required");
+        }
+
+        if (registerDto.getEmail() == null || !registerDto.getEmail().matches("^[\\w-.]+@([\\w-]+\\.)+[\\w-]{2,4}$")) {
+            throw new EmailError("Valid email is required");
+        }
+
+        if (registerDto.getPassword() == null || registerDto.getPassword().length() < 6) {
+            throw new PasswordError("Password must be at least 6 characters");
+        }
+
+        if(userRepository.existsByUserName(registerDto.getUserName())) throw new IllegalArgumentException("User In Use");
+
+
+        if (userRepository.existsByEmail(registerDto.getEmail())) {
+            throw new EmailError("Email already in use");
+        }
+
+        String encodedPassword = passwordEncoder.encode(registerDto.getPassword());
+        registerDto.setPassword(encodedPassword);
+        User user = new User();
+        user.setEmail(registerDto.getEmail());
+        user.setPassword(registerDto.getPassword());
+        user.setUserName(registerDto.getUserName());
+        userRepository.save(user);
+        RegisterResponse registerResponse = new RegisterResponse();
+        registerResponse.setToken(jwtUtil.generateToken(user));
+        return registerResponse;
+    }
 
     @Override
     public ProfileResponse updateAddress(ProfileDto profileDto) {
@@ -46,49 +93,27 @@ public class UserServiceImpl implements UserService {
         if (profileDto.getRole() == null) {
             throw new IllegalArgumentException("Role cannot be null");
         }
-        if("Bidder".equals(profileDto.getRole())) {
-            Optional<Bidder> bidder = bidderRepository.findById(profileDto.getUserId());
-            if (bidder.isPresent()) {
-                Bidder presentBidder  = bidder.get();
-                Profile profile = presentBidder.getProfile();
-                if(profile == null) {
-                    profile = new Profile();
-                    profile.setAccountStatus(AccountStatus.UNVERIFIED);
-                    profile.setAddress(profileDto.getAddress());
-                    presentBidder.setProfile(profile);
-                    bidderRepository.save(presentBidder);
-                    profileResponse.setProfile(presentBidder.getProfile());
-                    return profileResponse;
-                }else{
-                    profile.setAddress(profileDto.getAddress());
-                    presentBidder.setProfile(profile);
-                    bidderRepository.save(presentBidder);
-                    profileResponse.setProfile(presentBidder.getProfile());
-                    return profileResponse;
-                }
-            }
-        }else{
-            Optional<Seller> seller = sellerRepository.findById(profileDto.getUserId());
-            if (seller.isPresent()) {
-                Seller presentSeller = seller.get();
-                Profile profile = presentSeller.getProfile();
-                if(profile == null) {
-                    profile = new Profile();
-                    profile.setAccountStatus(AccountStatus.UNVERIFIED);
-                    profile.setAddress(profileDto.getAddress());
-                    presentSeller.setProfile(profile);
-                    sellerRepository.save(presentSeller);
-                    profileResponse.setProfile(presentSeller.getProfile());
-                    return profileResponse;
-                }else{
-                    profile.setAddress(profileDto.getAddress());
-                    presentSeller.setProfile(profile);
-                    sellerRepository.save(presentSeller);
-                    profileResponse.setProfile(presentSeller.getProfile());
-                    return profileResponse;
-                }
+        Optional<User> user = userRepository.findById(profileDto.getUserId());
+        if (user.isPresent()) {
+            User presentUser  = user.get();
+            Profile profile = presentUser.getProfile();
+            if(profile == null) {
+                profile = new Profile();
+                profile.setAccountStatus(AccountStatus.UNVERIFIED);
+                profile.setAddress(profileDto.getAddress());
+                presentUser.setProfile(profile);
+                userRepository.save(presentUser);
+                profileResponse.setProfile(presentUser.getProfile());
+                return profileResponse;
+            }else{
+                profile.setAddress(profileDto.getAddress());
+                presentUser.setProfile(profile);
+                userRepository.save(presentUser);
+                profileResponse.setProfile(presentUser.getProfile());
+                return profileResponse;
             }
         }
+
         throw new IllegalArgumentException("User not found");
     }
 
@@ -96,34 +121,42 @@ public class UserServiceImpl implements UserService {
     @Override
     public ProfileResponse updateImage(String id, String url, String role) {
         ProfileResponse profileResponse = new ProfileResponse();
-        if(Objects.equals(role, "") || role == null) {
-            throw new IllegalArgumentException("Role cannot be null");
-        }
         if(url == null || Objects.equals(url, "")) {
             throw new IllegalArgumentException("Url cannot be null");
         }
-        if("Bidder".equals(role)) {
-            Optional<Bidder> bidder = bidderRepository.findById(id);
-            if (bidder.isPresent()) {
-                Profile profile = bidder.get().getProfile();
+        Optional<User> user = userRepository.findById(id);
+            if (user.isPresent()) {
+                Profile profile = user.get().getProfile();
                 profile.setUrl(url);
-                bidderRepository.save(bidder.get());
-                profileResponse.setProfile(bidder.get().getProfile());
+                userRepository.save(user.get());
+                profileResponse.setProfile(user.get().getProfile());
                 return profileResponse;
             }
 
-        }
-        if("Seller".equals(role)) {
-            Optional<Seller> seller = sellerRepository.findById(id);
-            if (seller.isPresent()) {
-                Profile profile = seller.get().getProfile();
-                profile.setUrl(url);
-                sellerRepository.save(seller.get());
-                profileResponse.setProfile(seller.get().getProfile());
-                return profileResponse;
-            }
-        }
         throw new IllegalArgumentException("User not found");
+    }
+
+
+    @Override
+    public AuctionResponse auctionProduct(AuctionProductDto addProductDto) {
+        return productService.auctionProduct(addProductDto);
+    }
+
+    @Override
+    public BidResponse bid(BidDto bidDto){
+        return bidService.placeBid(bidDto);
+    }
+
+
+    @Override
+    public List<Product> viewProduct() {
+        return productService.viewAllProducts();
+    }
+
+
+    @Override
+    public String highestBidder(String productId) {
+        return bidService.highestBidder(productId);
     }
 
 

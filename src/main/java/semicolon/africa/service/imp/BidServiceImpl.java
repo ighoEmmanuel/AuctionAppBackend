@@ -1,12 +1,12 @@
 package semicolon.africa.service.imp;
 
+import org.bson.types.ObjectId;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import semicolon.africa.data.models.Bid;
-import semicolon.africa.data.models.Bidder;
 import semicolon.africa.data.models.Product;
+import semicolon.africa.data.models.User;
 import semicolon.africa.data.repositories.BidRepository;
-import semicolon.africa.data.repositories.BidderRepository;
 import semicolon.africa.data.repositories.ProductRepository;
 import semicolon.africa.data.repositories.UserRepository;
 import semicolon.africa.dtos.reposonse.BidResponse;
@@ -25,14 +25,12 @@ public class  BidServiceImpl implements BidService {
     private final BidRepository bidRepository;
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
-    private final BidderRepository bidderRepository;
 
     @Autowired
-    public BidServiceImpl(BidRepository bidRepository, ProductRepository productRepository, UserRepository userRepository, BidderRepository bidderRepository) {
+    public BidServiceImpl(BidRepository bidRepository, ProductRepository productRepository, UserRepository userRepository) {
         this.bidRepository = bidRepository;
         this.productRepository = productRepository;
         this.userRepository = userRepository;
-        this.bidderRepository = bidderRepository;
     }
 
     @Override
@@ -41,6 +39,16 @@ public class  BidServiceImpl implements BidService {
         if (originalProduct.isEmpty()) {
             throw new IllegalArgumentException("Product not found with ID: " + bidDto.getProductId());
         }
+        Optional<User> user = userRepository.findById(bidDto.getUserId());
+        if (user.isPresent()) {
+            User currentUser = user.get();
+            if (ObjectId.isValid(bidDto.getProductId()) &&
+                    currentUser.getProducts().stream()
+                            .anyMatch(product -> product.getId().equals(new ObjectId(bidDto.getProductId())))) {
+                throw new IllegalArgumentException("You cannot place bid on your product");
+            }
+        }
+
         Product sellersProduct = originalProduct.get();
         BigDecimal sellerPrice = sellersProduct.getPrice();
         BigDecimal buyerPrice = bidDto.getPrice();
@@ -83,8 +91,10 @@ public class  BidServiceImpl implements BidService {
             Product product = findProductById(productId);
             if(Objects.equals(bid.getProductId(), productId)){
                 if(Objects.equals(bid.getPrice(), product.getPrice())){
-                    Optional<Bidder> bidder = bidderRepository.findById(bid.getUserId());
-                    return bidder.get().getUserName();
+                    Optional<User> user = userRepository.findById(bid.getUserId());
+                    if(user.isPresent()){
+                        return user.get().getUserName();
+                    }
                 }
             }
         }

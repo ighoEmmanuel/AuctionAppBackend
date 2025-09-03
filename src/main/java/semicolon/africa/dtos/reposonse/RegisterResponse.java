@@ -7,8 +7,5 @@ import semicolon.africa.data.models.Profile;
 
 @Data
 public class RegisterResponse {
-    private String id;
-    private String userName;
-    private String email;
-    private Profile profile;
+    private String token;
 }
