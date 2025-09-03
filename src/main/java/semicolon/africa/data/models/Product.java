@@ -17,5 +17,6 @@ public class Product {
     private BigDecimal price;
     private LocalDateTime bidStartTime;
     private LocalDateTime bidStopTime;
+    private String imageUrl;
 
 }

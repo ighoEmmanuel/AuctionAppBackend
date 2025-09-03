@@ -24,9 +24,9 @@ public class JwtUtil {
     // ✅ Generate token with only lightweight claims
     public String generateToken(User user) {
         return Jwts.builder()
-                .setSubject(user.getId().toString())      // userId as subject
-                .claim("userName", user.getUserName())    // custom claim
-                .claim("email", user.getEmail())          // custom claim
+                .setSubject(user.getId().toString())
+                .claim("userName", user.getUserName())
+                .claim("email", user.getEmail())
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + expiration))
                 .signWith(key)

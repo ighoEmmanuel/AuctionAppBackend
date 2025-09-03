@@ -13,4 +13,5 @@ public class AuctionProductDto {
     private String sellerId;
     private LocalDateTime bidStart;
     private LocalDateTime  bidStop;
+    private String imageUrl;
 }

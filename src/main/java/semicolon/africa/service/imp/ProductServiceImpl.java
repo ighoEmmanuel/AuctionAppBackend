@@ -49,6 +49,7 @@ public class ProductServiceImpl implements ProductService {
         product.setName(productName);
         product.setBidStartTime(startTime);
         product.setBidStopTime(endTime);
+        product.setImageUrl(productDto.getImageUrl());
 
         user.get().getProducts().add(product);
         productRepository.save(product);
