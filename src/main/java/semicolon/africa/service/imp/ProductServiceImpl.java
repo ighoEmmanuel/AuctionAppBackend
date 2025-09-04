@@ -59,6 +59,7 @@ public class ProductServiceImpl implements ProductService {
         auctionResponse.setProductId(product.getId());
         auctionResponse.setProductName(product.getName());
         auctionResponse.setPrice(product.getPrice());
+        auctionResponse.setImageUrl(product.getImageUrl());
 
         return auctionResponse;
     }

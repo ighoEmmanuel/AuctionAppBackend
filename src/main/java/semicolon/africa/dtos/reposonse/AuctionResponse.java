@@ -10,4 +10,5 @@ public class AuctionResponse {
     String productId;
     String productName;
     BigDecimal price;
+    String imageUrl;
 }
